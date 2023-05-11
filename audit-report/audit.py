@@ -1,6 +1,18 @@
-### audit.py
+# audit-report.py
+#
 # The purpose of this script is to generate a csv of meta data for all jobs in a Domino project 
-###
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
 import requests
@@ -18,17 +30,60 @@ from joblib import delayed
 from api import DominoAPISession
 
 def read_config(filename):
-    
+    """Reads a configuration file, which set parameters for the generated report. The configuration
+    file includes the following sections:
+
+      * [column_order] - specifies how the columns should be ordered in the report
+      * [columns_to_expand] - what fields from the JSON should be expanded (flattened) into separate columns
+      * [columns_to_datetime] - which columns should be reformatted from POSIX timestamps to appropriate datetime format
+
+    Parameters
+    ----------
+    filename : str    
+        Absolute file name of the config file. 
+        Each section of the config file should include only column names. For example:
+
+        ```
+        [columns_to_expand]
+        stageTime
+        startedBy
+
+        [columns_to_datetime]
+        stageTime-submissionTime
+        stageTime-runStartTime
+        stageTime-completedTime
+        ```
+    """
     config = configparser.ConfigParser(allow_no_value=True)
-    config.read(filename)
+    
+    if os.path.isfile(filename):
+        config.read(filename)
+        logging.info("Successfully read sections {} from the config file.".format(config.sections()))
+    else:
+        logging.warning("Specified configuration file {} doesn't exist. Will use default values.".format(filename))
+
     return config
 
 
 def get_column_order(config):
+    """Creates a list, specifying the order of columns in the report.
+    The order is taken from the config file. If no config file has been set or the config file
+    doesn't contain a [column_order] section, a default ordering is used instead.
+
+    Parameters
+    ----------
+    config : configparser.ConfigParser
+        ConfigParser object, containing the configuration from the config file
+    
+    See also
+    --------
+    read_config(filename) - reads the configuration file and provides the input for this function
+    """
 
     if config.has_section("column_order"):
         column_order = config["column_order"]
     else:
+        logging.info("No column order provided via config file. Will use default values.")
         column_order = column_order = ["projectName", "number", "title", "startedBy-username", 
                                        "jobRunCommand", "statuses-executionStatus", "stageTime-submissionTime", 
                                        "stageTime-runStartTime", "stageTime-completedTime", "hardwareTier", 
@@ -263,7 +318,7 @@ def main():
     api = DominoAPISession.instance()
     logging.info("Generating audit report for project {}...".format(api._routes._project_name))
 
-    config = read_config("config.ini")
+    config = read_config("/Users/manchev/Desktop/opensce/OpenSCE/audit-report/config.ini")
     column_order = get_column_order(config)
     columns_to_expand = get_columns_to_expand(config)
     columns_to_datetime = get_columns_to_datetime(config)
@@ -293,12 +348,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-"""
-
-
-### timing info
-t = datetime.datetime.now() - t0
-logging.info(f"Audit report generated in {str(round(t.total_seconds(),1))} seconds.")
-"""
