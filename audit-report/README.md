@@ -24,7 +24,7 @@ python audit.py [-h] [config_file]
 
 The report will be saved in the project as a `csv` under `/mnt/artifacts/` with the naming convention: `audit-report_{project-name}_{YYYY-MM-DD_HH:MM:SSTZ}.csv`
 
-Report fields and their order can be customized by editing `audit-report/report_config.ini`
+Report fields and their order can be customized by editing `audit-report/config.ini`
 
 ## Support
 
@@ -34,4 +34,4 @@ For support please the OpenSCE community.
 - Workspace metadata
 - Multi-project support
 - Job filtering
-- Additional options in `report_config.ini`
+- Additional options in `config.ini`
