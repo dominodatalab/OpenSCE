@@ -99,6 +99,18 @@ def get_column_order(config):
 
 
 def get_columns_to_expand(config):
+    """Gets the list of columns that need to be expanded (flattened from JSON elements). This information is taken from 
+    the configuration file or, if no config file has been specified, a pre-defined set of values is returned.
+
+    Parameters
+    ----------
+    config : configparser.ConfigParser
+        ConfigParser object, containing the configuration from the config file
+    
+    See also
+    --------
+    read_config(filename) - reads the configuration file and provides the input for this function
+    """
     if config.has_section("columns_to_expand"):
         columns_to_expand = config["columns_to_expand"]
     else:
@@ -108,15 +120,31 @@ def get_columns_to_expand(config):
 
 
 def get_columns_to_datetime(config):
+    """Gets the list of columns that need to be converted to datetime string. This information is taken from 
+    the configuration file or, if no config file has been specified, a pre-defined set of values is returned.
+
+    Parameters
+    ----------
+    config : configparser.ConfigParser
+        ConfigParser object, containing the configuration from the config file
+    
+    See also
+    --------
+    read_config(filename) - reads the configuration file and provides the input for this function
+    convert_datetime(time_str) - converts a POSIX timestamp to locale appropriate time representation
+    """
     if config.has_section("columns_to_datetime"):
         columns_to_datetime = config["columns_to_datetime"]
     else:
         columns_to_datetime = ["stageTime-submissionTime", "stageTime-runStartTime", "stageTime-completedTime"]
 
-    return columns_to_datetime    
+    return columns_to_datetime
 
 
 def get_jobs():
+    """Pulls all executed job ids from the current project. This function returns a list:str with all job
+    ids returned by the Domino API run_lists() call.
+    """
     api = DominoAPISession.instance()
     ids = []
 
@@ -129,6 +157,8 @@ def get_jobs():
 
 
 def get_goals():
+    """Gets all project-associated goals and returns them as a list:str object.
+    """
     api = DominoAPISession.instance()
     url = api._routes.host + "/v4/projectManagement/" + api.project_id + "/goals"
     result = api.request_manager.get(url).json()
@@ -141,6 +171,22 @@ def get_goals():
 
 
 def get_job_data(job_id):
+    """Compiles a job_details object for a specific job. It includes:
+    
+    * Runtime execution details
+    * Comments associated with the job run
+    * Artifacts produced
+    * General metadata like run command, stage time, job title etc.
+
+    Parameters
+    ----------
+    job_id:str
+        job id to fetch all the details for
+
+    See also
+    --------
+    get_jobs() - returns a list:str with all job ids in the current project
+    """
     api = DominoAPISession.instance()
 
     endpoints = [f"/v4/jobs/{job_id}",
@@ -155,12 +201,31 @@ def get_job_data(job_id):
         result = api.request_manager.get(url).json()
         if result is not None:
             job_details.update(result)
-
+            
     return job_details
 
 
 def aggregate_job_data(job_ids, parallelize=True):
+    """Collects job details for all jobs attached to the project.
+    This function receives a list of all job ids and then pulls the details for each individual id by 
+    calling get_job_data(job_id).
 
+    If the parallelize argument is set to True, the function will try to execute the details
+    collection in parallel by sending parallel Domino API calls to the Domino instance. This can
+    substantially reduce the job details collection time.
+
+    Parameters
+    ----------
+    job_ids : list:str
+        a list of job run ids
+    parallelize : boolean
+        wether to parallelize the collection of job data or run it sequentially
+
+    See also
+    --------
+    get_jobs() - returns a list:str with all job ids in the current project
+    get_job_data(job_id) - compiles a job_details object with all the relevant metadata for a specific job
+    """
     api = DominoAPISession.instance()
 
     jobs = {}
