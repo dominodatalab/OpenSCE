@@ -23,6 +23,7 @@ import datetime
 import logging
 import sys
 import configparser
+import argparse
 
 from joblib import Parallel
 from joblib import delayed
@@ -255,8 +256,7 @@ def expand(field, job_id, jobs):
         ID of the specific job, which field/column is being expanded
     jobs   : dict
         collection of all jobs. The expected format matches the output of aggregate_job_data(), more specifically
-        job IDs are used as dict keys and all accompanying details are stored as values in JSON format
-    
+        job IDs are used as dict keys and all accompanying details are stored as values in JSON format.
     """
     for sub_field in jobs[job_id][field]:
         jobs[job_id]["{}-{}".format(field, sub_field)] = jobs[job_id][field].get(sub_field)
@@ -270,7 +270,6 @@ def convert_datetime(time_str):
     ----------
     time_str : str
         POSIX timestamp
-    
     """
     return datetime.datetime.fromtimestamp(time_str / 1e3, tz=datetime.timezone.utc).strftime("%F %X:%f %Z")
 
@@ -345,7 +344,35 @@ def reorder_columns(job, jobs, column_order):
     return result
 
 def clean_jobs(jobs, columns_to_expand, column_order, columns_to_datetime):
+    """Processes all fetched data according to the specifications provided in the config file.
+    More specifically, the function:
 
+    * Expands all relevant columns
+    * Converts datetime columns to a human-readable format
+    * Removes unnecessary information from job-attached comments
+    * Merges job-attached goals to the relevant jobs
+    * Reorders all columns according to the sorting order set in the config file (or the default
+    sorting order if no config file has been provided)
+
+    Parameters
+    ----------
+    jobs                : list:str
+        list of job ids, typically returned by get_jobs
+    columns_to_expand   : list:str
+        list of columns that need to be expanded (flattened from JSON structures)
+    column_order        : list:str
+        desired column order
+    columns_to_datetime : list:str
+        columns that need conversion to a human-readable time format
+
+    See also
+    --------
+    get_jobs() - returns a list:str with all job ids in the current project
+    get_columns_to_expand(config) - returns a list:str of columns that need to be expanded
+    clean_comments(job) - cleans up a comment section
+    merge_goals(job_id, jobs, goals) - appends any job-associated goals to a job entry
+    reorder_columns(job, jobs, column_order) - Reorders a job columns (fields) according to a specified order
+    """
     api = DominoAPISession.instance()
     project_name = api._routes._project_name
 
@@ -369,7 +396,7 @@ def clean_jobs(jobs, columns_to_expand, column_order, columns_to_datetime):
         jobs[job] = reorder_columns(job, jobs, column_order)
     
     return jobs
-    
+
 
 def main():
 
@@ -379,15 +406,27 @@ def main():
     logging.basicConfig(level=logging_level)
     log = logging.getLogger(__name__)
 
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="A lightweight tool to generate on-demand audit reports of \
+                                     code execution in a Domino project. \
+                                     This work is licensed \
+                                     under the GNU General Public License v3.0.")
+    
+    parser.add_argument("config_file", nargs="?", default="config.ini", type=str)
+    args = parser.parse_args()
+    
+
     # Connect to Domino
     api = DominoAPISession.instance()
     logging.info("Generating audit report for project {}...".format(api._routes._project_name))
 
-    config = read_config("/Users/manchev/Desktop/opensce/OpenSCE/audit-report/config.ini")
+    # Read config file
+    config = read_config(args.config_file)
     column_order = get_column_order(config)
     columns_to_expand = get_columns_to_expand(config)
     columns_to_datetime = get_columns_to_datetime(config)
 
+    # Process jobs
     start_time = datetime.datetime.now()
 
     job_ids = get_jobs()
@@ -397,7 +436,7 @@ def main():
     logging.info("Cleaning data...")
     jobs_cleaned = clean_jobs(jobs_raw, columns_to_expand, column_order, columns_to_datetime)
     
-  
+    # Generate report
     file_name = api._routes._project_name + "_audit_report_" \
                        + datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%d_%X%Z") \
                        + ".csv"
@@ -408,6 +447,7 @@ def main():
     df = pd.DataFrame.from_dict(jobs_cleaned, orient="index")
     df.to_csv(output_file, header=True, index=False)
 
+    # Wrap up
     elapsed_time = datetime.datetime.now() - start_time
     logging.info("Audit report generated in {} seconds.".format(str(round(elapsed_time.total_seconds(),1))))
 
