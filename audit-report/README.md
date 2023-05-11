@@ -19,7 +19,7 @@ Add the following commands to a compute environment's pre-run setup script, or r
 From within a terminal in a workspace, or as a batch job inside a Domino project:
 ```bash
 cd audit-report
-audit.py [-h] [config_file]
+python audit.py [-h] [config_file]
 ```
 
 The report will be saved in the project as a `csv` under `/mnt/artifacts/` with the naming convention: `audit-report_{project-name}_{YYYY-MM-DD_HH:MM:SSTZ}.csv`
